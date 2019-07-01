@@ -1,26 +1,26 @@
 # coding=UTF-8
 
 import requests
-import json
 from threading import Thread
 
 
 class ThreadWithReturnValue(Thread):
-    def __init__(self, group=None, target=None, name=None, args=(), kwargs={}):
-        Thread.__init__(self, group, target, name, args, kwargs)
+    def __init__(self, group=None, target=None, name=None,
+                 args=(), kwargs={}, verbose=None):
+        Thread.__init__(self, group, target, name, args, kwargs, verbose)
         self._return = None
 
     def run(self):
-        if self._target is not None:
-            self._return = self._target(*self._args,**self._kwargs)
+        if self._Thread__target is not None:
+            self._return = self._Thread__target(*self._Thread__args, **self._Thread__kwargs)
 
-    def join(self, *args) -> object:
-        Thread.join(self, *args)
+    def join(self):
+        Thread.join(self)
         return self._return
 
 
 class Host:
-    def __init__(self, address: str, port: int):
+    def __init__(self, address, port):  # type: (str, int) -> Host
         self.address = address
         self.port = port
 
@@ -47,10 +47,13 @@ def get_server_info(quick_connect_id, _id, url='http://global.quickconnect.to/Se
     try:
         return result
     except KeyError:
-        return get_server_info(quick_connect_id, _id, 'http://%s/Serv.php' % result.sites[0])
+        try:
+            return get_server_info(quick_connect_id, _id, 'http://%s/Serv.php' % result['sites'][0])
+        except KeyError:
+            return None
 
 
-def ping(host: Host, is_https: bool, timeout: int):
+def ping(host, is_https, timeout):  # type: (Host, bool, int) -> None
     scheme = "https" if is_https else "http"
     url = "%s://%s:%d/webman/pingpong.cgi?action=cors" % (scheme, host.address, host.port)
     try:
@@ -62,11 +65,11 @@ def ping(host: Host, is_https: bool, timeout: int):
     return None
 
 
-def create_ping_thread(host: Host, is_https: bool, timeout=10) -> ThreadWithReturnValue:
+def create_ping_thread(host, is_https, timeout=10):  # type: (Host, bool, int) -> ThreadWithReturnValue
     return ThreadWithReturnValue(target=ping, args=(host, is_https, timeout))
 
 
-def resolve_by_ping(server_info, is_https: bool) -> Host:
+def resolve_by_ping(server_info, is_https):  # type: (dict, bool) -> Host
     server = server_info['server']
     service = server_info['service']
     port = service['port']
@@ -146,12 +149,15 @@ def request_tunnel(server_info, quick_connect_id, _id):
     return None
 
 
-def resolve(quick_connect_id, is_https: bool = True) -> Host:
+def resolve(quick_connect_id, is_https=True):  # type: (str, bool) -> Host
     if ':' in quick_connect_id or '.' in quick_connect_id or quick_connect_id == '':
         raise Exception('%s is not a QuickConnect ID' % quick_connect_id)
 
     _id = 'dsm_portal_https' if is_https else 'dsm_portal'
     server_info = get_server_info(quick_connect_id, _id)
+    if server_info is None:
+        raise Exception("We cannot find QuickConnect ID %s" % quick_connect_id)
+
     result = resolve_by_ping(server_info, is_https)
     if result is not None:
         return result
